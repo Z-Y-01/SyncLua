@@ -23,12 +23,47 @@ def get_file_changelist(file_path):
             return line.split()[-1]
     return None
 
+## 添加文件到 Perforce
+def add_file_to_p4(cl_num, file_path):
+    p4_add_result = run_p4(f'p4 add -c {cl_num} "{file_path}"')
+    if not p4_add_result:
+        print(f"!!!!!!!! [Error] Failed to p4 add {file_path}, result: [{p4_add_result}]")
+        return False
+    
+    add_results = p4_add_result.split('-')
+    add_result = add_results[1]
+    add_path_result = add_results[0]
+    if add_result == " opened for add":
+        print(f"[ADD OK] p4 add result for {add_path_result}: [{add_result}]")
+        return True
+
+    print(f"[Warning] p4 add result for {add_path_result}: [{add_result}]")
+    return False
+
+## 将文件从一个 CL 挪到目标 CL
+def reopen_file_to_cl(file_path, cur_cl_num, target_cl):
+    p4_reopen_result = run_p4(f'p4 reopen -c {target_cl} "{file_path}"')
+    if not p4_reopen_result:
+        print(f"!!!!!!!! [Error] Failed to p4 reopen {file_path} from CL {cur_cl_num} to CL {target_cl}, result: [{p4_reopen_result}]")
+        return False
+    
+    reopen_result = p4_reopen_result.split('-')[1]
+    print(f"[REOPEN OK] p4 reopen result for {file_path} from CL {cur_cl_num} to CL {target_cl}: [{reopen_result}]")
+    return True
+
 def main():
     if len(sys.argv) < 2:
         print("Error: Missing Changelist ID.")
         sys.exit(1)
 
+    ## 获取 CL ID
     cl_num = sys.argv[1]
+
+    ## 获取是否要允许挪到目标 CL, 如果没有参数则默认为 False
+    allow_reopen = False
+    if len(sys.argv) >= 3:
+        allow_reopen = sys.argv[2].lower() == 'true'
+
     targetDirs = [os.path.abspath(dir) for dir in TARGET_DIRS]
 
     print(f"--- WORKING DIR: {os.getcwd()} ---")
@@ -57,32 +92,24 @@ def main():
             if os.path.isfile(luac_path):
                 p4_edit_result = run_p4(f'p4 edit -c {cl_num} "{luac_path}"')
                 if not p4_edit_result:
-                    p4_add_result = run_p4(f'p4 add -c {cl_num} "{luac_path}"')
-                    if not p4_add_result:
-                        print(f"!!!!!!!! [Error] Failed to p4 add {luac_file_name}, result: [{p4_add_result}]")
-                        continue
-                    
-                    add_results = p4_add_result.split('-')
-                    add_result = add_results[1]
-                    add_path_result = add_results[0]
-                    if add_result == " opened for add":
-                        print(f"[OK] p4 add result for {add_path_result}: [{add_result}]")
-                        continue
-
-                    print(f"[Warning] p4 add result for {add_path_result}: [{add_result}]")
+                    add_file_to_p4(cl_num, luac_path)
                     continue
 
                 edit_results = p4_edit_result.split('-')
                 edit_result = edit_results[1]
                 edit_path_result = edit_results[0]
                 if edit_result == " opened for edit":
-                    print(f"[OK] p4 edit result for {edit_path_result}: [{edit_result}]")
+                    print(f"[OPENED OK] p4 edit result for {edit_path_result}: [{edit_result}]")
                     continue
 
                 cur_cl_num = get_file_changelist(luac_path)
                 if cur_cl_num == cl_num:
                     print(f"[Warning] p4 edit result for {edit_path_result}: [{edit_result}]")
                     continue
+
+                if allow_reopen and cur_cl_num != cl_num:
+                    if reopen_file_to_cl(luac_path, cur_cl_num, cl_num):
+                        continue
 
                 print(f"!!!!!!!! [Error] p4 edit result for {edit_path_result}: [{edit_result}], current CL: {cur_cl_num}")
 
