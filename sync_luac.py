@@ -27,7 +27,7 @@ def get_file_changelist(file_path):
 def add_file_to_p4(cl_num, file_path):
     p4_add_result = run_p4(f'p4 add -c {cl_num} "{file_path}"')
     if not p4_add_result:
-        print(f"!!!!!!!! [Error] Failed to p4 add {file_path}, result: [{p4_add_result}]")
+        print(f"!!!!!!!! [ERROR] Failed to p4 add {file_path}, result: [{p4_add_result}]")
         return False
     
     add_results = p4_add_result.split('-')
@@ -44,11 +44,11 @@ def add_file_to_p4(cl_num, file_path):
 def reopen_file_to_cl(file_path, cur_cl_num, target_cl):
     p4_reopen_result = run_p4(f'p4 reopen -c {target_cl} "{file_path}"')
     if not p4_reopen_result:
-        print(f"!!!!!!!! [Error] Failed to p4 reopen {file_path} from CL {cur_cl_num} to CL {target_cl}, result: [{p4_reopen_result}]")
+        print(f"!!!!!!!! [ERROR] Failed to p4 reopen {file_path} from CL {cur_cl_num} to CL {target_cl}, result: [{p4_reopen_result}]")
         return False
     
     reopen_result = p4_reopen_result.split('-')[1]
-    print(f"[REOPEN OK] p4 reopen result for {file_path} from CL {cur_cl_num} to CL {target_cl}: [{reopen_result}]")
+    print(f"[REOPEN RESULT] p4 reopen result for {file_path} from CL {cur_cl_num} to CL {target_cl}: [{reopen_result}]")
     return True
 
 def main():
@@ -111,7 +111,7 @@ def main():
                     if reopen_file_to_cl(luac_path, cur_cl_num, cl_num):
                         continue
 
-                print(f"!!!!!!!! [Error] p4 edit result for {edit_path_result}: [{edit_result}], current CL: {cur_cl_num}")
+                print(f"!!!!!!!! [ERROR] p4 edit result for {edit_path_result}: [{edit_result}], current CL: {cur_cl_num}")
 
         print(f"--- End. {lua_file_name} ---")
         print(f"--------------------")
