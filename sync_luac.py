@@ -51,6 +51,33 @@ def reopen_file_to_cl(file_path, cur_cl_num, target_cl):
     print(f"[REOPEN RESULT] p4 reopen result for {file_path} from CL {cur_cl_num} to CL {target_cl}: [{reopen_result}]")
     return True
 
+def delete_file_from_p4(cl_num, file_path, allow_reopen=False):
+    p4_delete_result = run_p4(f'p4 delete -c {cl_num} "{file_path}"')
+    if p4_delete_result and "opened for delete" in p4_delete_result:
+        print(f"[DELETE OK] p4 delete result for {file_path}: [{p4_delete_result}]")
+        return True
+    
+    cur_cl_num = get_file_changelist(file_path)
+    if not cur_cl_num:
+        print(f"!!!!!!!! [ERROR] Failed to p4 delete {file_path}, file may not exist in workspace or depot.")
+        return False
+    
+    if cur_cl_num == cl_num:
+        print(f"[Warning] {file_path} is already opened in current CL {cl_num}.")
+        return True
+    
+    if allow_reopen:
+        if reopen_file_to_cl(file_path, cur_cl_num, cl_num):
+            p4_delete_result = run_p4(f'p4 delete -c {cl_num} "{file_path}"')
+            if p4_delete_result:
+                print(f"[DELETE OK] p4 delete result for {file_path}: [{p4_delete_result}]")
+                return True
+            print(f"!!!!!!!! [ERROR] Failed to p4 delete {file_path} after reopening.")
+            return False
+    
+    print(f"!!!!!!!! [ERROR] {file_path} is opened in CL {cur_cl_num} and cannot be deleted in CL {cl_num}.")
+    return False
+
 def main():
     if len(sys.argv) < 2:
         print("Error: Missing Changelist ID.")
@@ -78,9 +105,28 @@ def main():
 
     print("--- Processing Files ---")
     for lua_depot in luaDepots.split('\n'):
+        lua_depot = lua_depot.strip()
+        if not lua_depot:
+            continue
+
         fileInfo = os.path.basename(lua_depot)
         lua_file_name = fileInfo.split('#')[0]
         if not lua_file_name.endswith('.lua'):
+            continue
+
+        action = None
+        if ' - ' in lua_depot:
+            action = lua_depot.split(' - ', 1)[1].lower()
+        is_delete = action and 'delete' in action
+
+        if is_delete:
+            print(f"--------------------")
+            print(f"--- Delete. {lua_file_name} ---")
+            for targetDir in targetDirs:
+                luac_path = os.path.join(targetDir, lua_file_name + 'c')
+                delete_file_from_p4(cl_num, luac_path, allow_reopen)
+            print(f"--- End Delete. {lua_file_name} ---")
+            print(f"--------------------")
             continue
 
         luac_file_name = lua_file_name + 'c'
